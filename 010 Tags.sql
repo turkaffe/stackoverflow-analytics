@@ -89,7 +89,7 @@ GO
     
     Author:     turkaffe
     Created:    2026-05-07
-    Modified:   [Date] - [Description of change]
+    Modified:   20260521 - slight preformance gains
     
     Example:
         EXEC dbo.GetTagsByString @SearchTags = 'python, c#', @ExactMatchOnly = 0, @Sensitivity = 3;
@@ -108,9 +108,12 @@ BEGIN
         RAISERROR('No Search Tag(s) provided', 16, 1);
         RETURN (0);
     END;
+    
+    CREATE TABLE #search( tag VARCHAR(50) NOT NULL);
+    CREATE CLUSTERED INDEX cx_tempsearch ON #search (tag);
 
+    INSERT INTO #search(tag)
     SELECT TRIM(value) tag
-    INTO #search
     FROM STRING_SPLIT(@SearchTags, ',');
 
     CREATE TABLE #tags
@@ -119,19 +122,20 @@ BEGIN
         Tag VARCHAR(50) NOT NULL,
         MatchScore INT NULL
     );
+    
+    CREATE CLUSTERED INDEX cx_temptags ON #tags (Tag);
 
     INSERT INTO #tags
     (
         Id,
         Tag
     )
-    SELECT Id,
-           Tag
+    SELECT t.Id,
+           t.Tag
     FROM dbo.Tags t
-    WHERE EXISTS
-    (
-        SELECT * FROM #search s WHERE t.tag LIKE s.tag + '%'
-    );
+    JOIN #search s
+        ON  t.tag LIKE s.tag + '%'
+    WHERE 1=1;
 
     WITH ScoredTags
     AS (SELECT t.Id,
